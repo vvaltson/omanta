@@ -2189,10 +2189,11 @@ Window {
     Shortcut { sequence: "Alt+Up"; onActivated: if (root.currentTab) root.currentTab.goUp() }
     Shortcut { sequence: "Alt+Home"; onActivated: if (root.currentTab) root.currentTab.navigate(Platform.homePath()) }
 
-    // Split view: F3 toggles the second pane, F6 moves the keyboard (and the
-    // chrome) between panes — the classic dual-pane bindings.
+    // Split view: F3 toggles the second pane, F6 swaps the two. Tab moves the
+    // keyboard (and the chrome) between them, handled in TabPanes so it only
+    // fires from a pane.
     Shortcut { sequence: "F3"; onActivated: if (root.currentSlot) root.currentSlot.toggleSplit() }
-    Shortcut { sequence: "F6"; onActivated: if (root.currentSlot) root.currentSlot.cyclePane() }
+    Shortcut { sequence: "F6"; onActivated: if (root.currentSlot) root.currentSlot.swapPanes() }
     Shortcut { sequence: "F4"; onActivated: if (root.currentSlot) root.currentSlot.togglePreview() }
 
     Shortcut { sequence: "F9"; onActivated: root.toggleSidebar() }

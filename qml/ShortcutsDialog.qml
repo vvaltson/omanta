@@ -25,7 +25,8 @@ Dialog {
             ["Ctrl+N", qsTr("New window")], ["Ctrl+Shift+W", qsTr("Close window")],
             ["Ctrl+T", qsTr("New tab")], ["Ctrl+W", qsTr("Close tab")],
             ["Ctrl+Tab / Ctrl+PgDn", qsTr("Next tab")], ["Ctrl+Shift+Tab / Ctrl+PgUp", qsTr("Previous tab")],
-            ["F3", qsTr("Split view")], ["F6", qsTr("Switch pane")],
+            ["F3", qsTr("Split view")], ["Tab", qsTr("Switch pane")],
+            ["F6", qsTr("Swap panes")],
             ["F4", qsTr("Preview pane")],
             ["F9", qsTr("Toggle sidebar")]] },
         { name: qsTr("Navigation"), rows: [

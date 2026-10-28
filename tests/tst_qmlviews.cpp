@@ -111,6 +111,7 @@ private Q_SLOTS:
     void tabCloseButtonClosesTab();
     void tabTitlesFollowNavigation();
     void previewPaneShowsTheSelectedFile();
+    void tabSwitchesAndF6SwapsPanes();
     void dropHintAndSidebarBookmarkDrop();
     void bookmarksReorderByHolding();
     void pickerBookmarksDoNotReorder();
@@ -2019,6 +2020,79 @@ void TestQmlViews::previewPaneShowsTheSelectedFile()
     QVERIFY(first && second);
     QTRY_VERIFY(qobject_cast<QQuickItem *>(first)->isVisible()
                 && qobject_cast<QQuickItem *>(second)->isVisible());
+}
+
+// Split view's keys: Tab hands the keyboard to the other pane, F6 swaps the
+// panes' places with the active one staying active. Unsplit, neither does
+// anything.
+void TestQmlViews::tabSwitchesAndF6SwapsPanes()
+{
+    QTest::failOnWarning(QRegularExpression("Required property|Cannot assign.*undefined|TypeError|ReferenceError"));
+    TempTree tree;
+    QTemporaryDir config;
+    for (const char *env : {"OMANTA_SETTINGS_FILE", "OMANTA_STARRED_FILE",
+                           "OMANTA_SERVERS_FILE", "OMANTA_BOOKMARKS_FILE"})
+        qputenv(env, config.filePath(env).toUtf8());
+    qputenv("OMANTA_COLORS_FILE", config.filePath("missing/parent/colors.toml").toUtf8());
+    tree.writeFile("file.txt");
+
+    QQmlApplicationEngine engine;
+    engine.addImageProvider("fileicon", new IconImageProvider);
+    engine.addImageProvider("thumbnail", new ThumbnailProvider);
+    engine.addImageProvider("dragcard", new DragCardProvider);
+    Application application(&engine);
+    Platform platform;
+    SystemTheme theme;
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "App", &application);
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "Platform", &platform);
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "Theme", &theme);
+    application.openWindow(tree.path());
+    QQuickWindow *window = nullptr;
+    for (QObject *child : application.children()) {
+        if (child->property("currentTab").isValid()) {
+            window = qobject_cast<QQuickWindow *>(child);
+            break;
+        }
+    }
+    QVERIFY(window);
+    QObject *slot = window->property("currentSlot").value<QObject *>();
+    QVERIFY(slot);
+    window->requestActivate();
+    QTRY_VERIFY(window->isActive());
+    const auto active = [&] { return slot->property("activePane").value<QObject *>(); };
+    const auto x = [](QObject *pane) {
+        return qobject_cast<QQuickItem *>(pane)->mapToScene(QPointF()).x();
+    };
+
+    // Unsplit, Tab and F6 leave the one pane alone.
+    QObject *only = active();
+    qobject_cast<QQuickItem *>(only)->forceActiveFocus();
+    QTest::keyClick(window, Qt::Key_Tab);
+    QTest::keyClick(window, Qt::Key_F6);
+    QCOMPARE(active(), only);
+
+    QVERIFY(QMetaObject::invokeMethod(slot, "toggleSplit"));
+    QObject *left = slot->property("primary").value<QObject *>()->property("tab").value<QObject *>();
+    QObject *right = nullptr;
+    QTRY_VERIFY((right = slot->property("secondary").value<QObject *>()->property("tab").value<QObject *>()));
+    QTRY_VERIFY(x(left) < x(right));
+    QCOMPARE(active(), left);
+
+    QTest::keyClick(window, Qt::Key_Tab);
+    QTRY_COMPARE(active(), right);
+    QVERIFY(qobject_cast<QQuickItem *>(right)->hasActiveFocus());
+    QTest::keyClick(window, Qt::Key_Tab);
+    QTRY_COMPARE(active(), left);
+    QTest::keyClick(window, Qt::Key_Backtab, Qt::ShiftModifier);
+    QTRY_COMPARE(active(), right);
+
+    // F6: the right pane moves left and is still the one being worked in.
+    QTest::keyClick(window, Qt::Key_F6);
+    QTRY_VERIFY(x(right) < x(left));
+    QCOMPARE(active(), right);
+    QTest::keyClick(window, Qt::Key_F6);
+    QTRY_VERIFY(x(left) < x(right));
+    QCOMPARE(active(), right);
 }
 
 // Drives drag events through the window the way the platform does, so the

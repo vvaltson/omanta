@@ -5,7 +5,7 @@ import Omanta.Runtime
 
 // One tab slot: a single Tab, or two side by side while split view (F3) is
 // on. The window's chrome talks to `activePane` — whichever pane last took a
-// press or was handed the keyboard with F6 — so the toolbar, path bar, status
+// press or was handed the keyboard with Tab — so the toolbar, path bar, status
 // line, shortcuts and menus all follow the split without knowing about it.
 // The preview (F4) shows the active pane's file in the other half: in place
 // of the inactive pane while split, else on the right.
@@ -62,6 +62,16 @@ FocusScope {
         if (!split || !secondary.tab)
             return;
         activePane = activePane === primary.tab ? secondary.tab : primary.tab;
+        activePane.forceActiveFocus();
+    }
+
+    // F6: the panes trade places, each keeping its folder, history and
+    // selection; the one being worked in stays active on its new side.
+    function swapPanes() {
+        if (!split || !secondary.tab)
+            return;
+        splitView.moveItem(1, 0);
+        primary = secondary;
         activePane.forceActiveFocus();
     }
 
@@ -127,6 +137,18 @@ FocusScope {
                     slot.transferRequested(sources, destination, isMove)
                 onPreviewUnavailable: slot.previewUnavailable()
             }
+        }
+
+        // While split, Tab hands the keyboard to the other pane. The view
+        // leaves Tab unhandled, so it arrives here; dialogs and the picker
+        // are outside the panes and keep Tab for moving between fields.
+        Keys.onTabPressed: event => {
+            event.accepted = slot.split;
+            slot.cyclePane();
+        }
+        Keys.onBacktabPressed: event => {
+            event.accepted = slot.split;
+            slot.cyclePane();
         }
 
         // Any press in a pane makes it the one the chrome acts on, before
