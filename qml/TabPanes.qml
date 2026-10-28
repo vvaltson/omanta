@@ -14,9 +14,13 @@ FocusScope {
     property string initialSelection: ""
 
     property bool split: false
-    property Item activePane: firstCell.tab
-    readonly property int activePaneIndex: split && secondLoader.item
-                                           && activePane === secondLoader.item.tab ? 1 : 0
+    // The two panes swap roles: `primary` is the one left when the split
+    // closes and always sits on the left; `secondary` loads on the right.
+    property PaneLoader primary: firstLoader
+    readonly property PaneLoader secondary: primary === firstLoader ? secondLoader : firstLoader
+    property Item activePane: primary.item ? primary.item.tab : null
+    readonly property int activePaneIndex: split && secondary.item
+                                           && activePane === secondary.item.tab ? 1 : 0
 
     signal contextMenuRequested()
     signal mountNeeded(string location)
@@ -32,20 +36,25 @@ FocusScope {
         if (!split) {
             // The second pane opens where the user is now — a snapshot, not a
             // binding: from here the two navigate independently.
-            secondLoader.spawnPath = activePane.path;
+            secondary.spawnPath = activePane.path;
+            secondary.spawnSelection = "";
             split = true;
         } else {
-            activePane = firstCell.tab;
+            // The pane being worked in stays, history and all; the other closes.
+            if (secondary.item && activePane === secondary.item.tab) {
+                splitView.moveItem(1, 0);
+                primary = secondary;
+            }
             split = false;
         }
         activePane.forceActiveFocus();
     }
 
     function cyclePane() {
-        if (!split || !secondLoader.item)
+        if (!split || !secondary.item)
             return;
-        activePane = activePane === firstCell.tab ? secondLoader.item.tab
-                                                  : firstCell.tab;
+        activePane = activePane === primary.item.tab ? secondary.item.tab
+                                                     : primary.item.tab;
         activePane.forceActiveFocus();
     }
 
@@ -124,7 +133,27 @@ FocusScope {
         }
     }
 
+    component PaneLoader: Loader {
+        id: loader
+
+        property string spawnPath: ""
+        property string spawnSelection: ""
+
+        SplitView.fillWidth: slot.primary === loader
+        SplitView.preferredWidth: slot.width / 2
+        SplitView.minimumWidth: 220
+        active: slot.split || slot.primary === loader
+        visible: active
+        sourceComponent: PaneCell {
+            focus: true
+            startPath: loader.spawnPath
+            startSelection: loader.spawnSelection
+        }
+    }
+
     SplitView {
+        id: splitView
+
         anchors.fill: parent
         orientation: Qt.Horizontal
 
@@ -142,28 +171,16 @@ FocusScope {
             }
         }
 
-        PaneCell {
-            id: firstCell
+        PaneLoader {
+            id: firstLoader
 
-            SplitView.fillWidth: true
-            SplitView.minimumWidth: 220
             focus: true
-            startPath: slot.initialPath
-            startSelection: slot.initialSelection
+            spawnPath: slot.initialPath
+            spawnSelection: slot.initialSelection
         }
 
-        Loader {
+        PaneLoader {
             id: secondLoader
-
-            property string spawnPath: ""
-
-            SplitView.preferredWidth: slot.width / 2
-            SplitView.minimumWidth: 220
-            active: slot.split
-            visible: slot.split
-            sourceComponent: PaneCell {
-                startPath: secondLoader.spawnPath
-            }
         }
     }
 }
