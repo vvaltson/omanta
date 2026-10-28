@@ -2193,6 +2193,7 @@ Window {
     // chrome) between panes — the classic dual-pane bindings.
     Shortcut { sequence: "F3"; onActivated: if (root.currentSlot) root.currentSlot.toggleSplit() }
     Shortcut { sequence: "F6"; onActivated: if (root.currentSlot) root.currentSlot.cyclePane() }
+    Shortcut { sequence: "F4"; onActivated: if (root.currentSlot) root.currentSlot.togglePreview() }
 
     Shortcut { sequence: "F9"; onActivated: root.toggleSidebar() }
     // Only while the sidebar is slid over or its bookmarks are being

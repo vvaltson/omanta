@@ -5,6 +5,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QGuiApplication>
 #include <QFileInfo>
 #include <QLocale>
@@ -49,6 +50,29 @@ bool Platform::exists(const QString &path) const
 bool Platform::isLocal(const QString &location) const
 {
     return Location::isLocal(location);
+}
+
+QVariantMap Platform::textPreview(const QString &path, int maxBytes) const
+{
+    if (!QFileInfo(path).isFile())
+        return {};
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return {};
+    QByteArray data = file.read(8000);
+    if (data.contains('\0'))
+        return {};
+    if (data.size() <= maxBytes)
+        data += file.read(qint64(maxBytes) + 1 - data.size());
+    const bool truncated = data.size() > maxBytes;
+    data.truncate(maxBytes);
+    return { { QStringLiteral("text"), QString::fromUtf8(data) },
+             { QStringLiteral("truncated"), truncated } };
+}
+
+QUrl Platform::fileUrl(const QString &path) const
+{
+    return QUrl::fromLocalFile(path);
 }
 
 bool Platform::isArchiveType(const QString &contentType) const

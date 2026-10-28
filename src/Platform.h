@@ -3,7 +3,9 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QUrl>
 #include <QVariantList>
+#include <QVariantMap>
 
 // Small bridge for the things QML cannot do itself: launching files with their
 // default application, opening a terminal, and formatting sizes the way the
@@ -52,6 +54,14 @@ public:
     // "photos.tar.gz" → "photos": the suggested name for the Compress dialog
     // and the landing folder rule, compound-extension aware.
     Q_INVOKABLE QString archiveStem(const QString &name) const;
+
+    // The preview pane (F4). textPreview reads the start of a local file as
+    // UTF-8: {text, truncated}, or an empty map when it is not a regular file
+    // (a FIFO would block the read forever) or looks binary — a NUL in the
+    // first 8000 bytes, git's test. fileUrl turns a local path into the URL
+    // Image and PdfDocument want, with '#' and '?' escaped.
+    Q_INVOKABLE QVariantMap textPreview(const QString &path, int maxBytes) const;
+    Q_INVOKABLE QUrl fileUrl(const QString &path) const;
 
     // Drag and drop. uriList renders locations as the text/uri-list payload a
     // drag carries; locationsFromUrls is its inverse for a drop's URLs.

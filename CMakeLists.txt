@@ -90,6 +90,8 @@ set(OMANTA_QML_FILES
     qml/Main.qml
     qml/Tab.qml
     qml/TabPanes.qml
+    qml/PreviewPane.qml
+    qml/PreviewPdf.qml
     qml/OpsPie.qml
     qml/PathBar.qml
     qml/Sidebar.qml

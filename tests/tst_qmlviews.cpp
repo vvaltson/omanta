@@ -22,6 +22,7 @@
 #include <QDropEvent>
 #include <QMimeData>
 #include <QGuiApplication>
+#include <QImage>
 #include <QPointer>
 #include <QProcess>
 #include <QQmlApplicationEngine>
@@ -109,6 +110,7 @@ private Q_SLOTS:
     void spacePreviewsInSushi();
     void tabCloseButtonClosesTab();
     void tabTitlesFollowNavigation();
+    void previewPaneShowsTheSelectedFile();
     void dropHintAndSidebarBookmarkDrop();
     void bookmarksReorderByHolding();
     void pickerBookmarksDoNotReorder();
@@ -1905,6 +1907,118 @@ void TestQmlViews::tabTitlesFollowNavigation()
     go("two");
     openTab("one");
     QTRY_COMPARE(tabStripLabels(window->contentItem()), (QStringList{"two", "one"}));
+}
+
+// F4's pane follows the active pane's selection and picks a view by content:
+// an image, anything without a NUL in its start as text, the rest a card.
+void TestQmlViews::previewPaneShowsTheSelectedFile()
+{
+    QTest::failOnWarning(QRegularExpression("Required property|Cannot assign.*undefined|TypeError|ReferenceError"));
+    TempTree tree;
+    QTemporaryDir config;
+    for (const char *env : {"OMANTA_SETTINGS_FILE", "OMANTA_STARRED_FILE",
+                           "OMANTA_SERVERS_FILE", "OMANTA_BOOKMARKS_FILE"})
+        qputenv(env, config.filePath(env).toUtf8());
+    qputenv("OMANTA_COLORS_FILE", config.filePath("missing/parent/colors.toml").toUtf8());
+
+    QImage picture(40, 30, QImage::Format_RGB32);
+    picture.fill(Qt::red);
+    QVERIFY(picture.save(tree.filePath("picture.png")));
+    const auto write = [&](const char *name, const QByteArray &bytes) {
+        QFile file(tree.filePath(name));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(bytes);
+    };
+    write("script.sh", "#!/bin/sh\necho hello\n");
+    write("blob.bin", QByteArray("\x01\x02\0\0\x03", 5));
+    QVERIFY(QDir().mkpath(tree.filePath("folder")));
+
+    QQmlApplicationEngine engine;
+    engine.addImageProvider("fileicon", new IconImageProvider);
+    engine.addImageProvider("thumbnail", new ThumbnailProvider);
+    engine.addImageProvider("dragcard", new DragCardProvider);
+    Application application(&engine);
+    Platform platform;
+    SystemTheme theme;
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "App", &application);
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "Platform", &platform);
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "Theme", &theme);
+    application.openWindow(tree.path());
+    QQuickWindow *window = nullptr;
+    for (QObject *child : application.children()) {
+        if (child->property("currentTab").isValid()) {
+            window = qobject_cast<QQuickWindow *>(child);
+            break;
+        }
+    }
+    QVERIFY(window);
+    QObject *tab = window->property("currentTab").value<QObject *>();
+    QObject *slot = window->property("currentSlot").value<QObject *>();
+    QVERIFY(tab && slot);
+    QTRY_VERIFY(tab->property("files").value<QObject *>()->property("count").toInt() == 4);
+
+    QVERIFY(!findItem(window->contentItem(), "objectName", "previewPane"));
+    QVERIFY(QMetaObject::invokeMethod(slot, "togglePreview"));
+    QQuickItem *pane = nullptr;
+    QTRY_VERIFY((pane = findItem(window->contentItem(), "objectName", "previewPane")));
+    QCOMPARE(pane->property("kind").toString(), QString());
+
+    const auto select = [&](const char *name) {
+        QVERIFY(QMetaObject::invokeMethod(tab, "selectOnly", Q_ARG(QVariant, QString::fromLatin1(name))));
+    };
+    select("script.sh");
+    QTRY_COMPARE(pane->property("kind").toString(), QStringLiteral("text"));
+    select("picture.png");
+    QTRY_COMPARE(pane->property("kind").toString(), QStringLiteral("image"));
+    select("blob.bin");
+    QTRY_COMPARE(pane->property("kind").toString(), QStringLiteral("card"));
+    select("folder");
+    QTRY_COMPARE(pane->property("kind").toString(), QStringLiteral("card"));
+
+    // F4 again closes it.
+    QVERIFY(QMetaObject::invokeMethod(slot, "togglePreview"));
+    QTRY_VERIFY(!findItem(window->contentItem(), "objectName", "previewPane"));
+
+    // Split, working on the right: the preview takes the inactive left half,
+    // and F4 again brings that pane back.
+    QVERIFY(QMetaObject::invokeMethod(slot, "toggleSplit"));
+    QTRY_VERIFY(slot->property("secondary").value<QObject *>()->property("tab").value<QObject *>());
+    QVERIFY(QMetaObject::invokeMethod(slot, "cyclePane"));
+    auto *right = qobject_cast<QQuickItem *>(slot->property("activePane").value<QObject *>());
+    auto *left = qobject_cast<QQuickItem *>(
+        slot->property("primary").value<QObject *>()->property("tab").value<QObject *>());
+    QVERIFY(right && left && right != left);
+    QTRY_VERIFY(left->isVisible() && right->isVisible());
+    QVERIFY(QMetaObject::invokeMethod(slot, "togglePreview"));
+    QTRY_VERIFY((pane = findItem(window->contentItem(), "objectName", "previewPane")));
+    QTRY_VERIFY(!left->isVisible());
+    QVERIFY(right->isVisible());
+    QTRY_VERIFY(pane->mapToScene(QPointF()).x() < right->mapToScene(QPointF()).x());
+    QVERIFY(QMetaObject::invokeMethod(slot, "togglePreview"));
+    QTRY_VERIFY(!findItem(window->contentItem(), "objectName", "previewPane"));
+    QVERIFY(left->isVisible());
+
+    // F3 while the preview has the second half: the new pane takes it.
+    QVERIFY(QMetaObject::invokeMethod(slot, "toggleSplit"));
+    QTRY_COMPARE(slot->property("split").toBool(), false);
+    QVERIFY(QMetaObject::invokeMethod(slot, "togglePreview"));
+    QTRY_VERIFY(findItem(window->contentItem(), "objectName", "previewPane"));
+    QVERIFY(QMetaObject::invokeMethod(slot, "toggleSplit"));
+    QTRY_VERIFY(!findItem(window->contentItem(), "objectName", "previewPane"));
+    QCOMPARE(slot->property("preview").toBool(), false);
+
+    // ...and when it was covering a pane, one F3 brings that pane back
+    // rather than closing the split behind it.
+    QVERIFY(QMetaObject::invokeMethod(slot, "togglePreview"));
+    QTRY_VERIFY(findItem(window->contentItem(), "objectName", "previewPane"));
+    QVERIFY(QMetaObject::invokeMethod(slot, "toggleSplit"));
+    QTRY_VERIFY(!findItem(window->contentItem(), "objectName", "previewPane"));
+    QCOMPARE(slot->property("split").toBool(), true);
+    QObject *first = slot->property("primary").value<QObject *>()->property("tab").value<QObject *>();
+    QObject *second = slot->property("secondary").value<QObject *>()->property("tab").value<QObject *>();
+    QVERIFY(first && second);
+    QTRY_VERIFY(qobject_cast<QQuickItem *>(first)->isVisible()
+                && qobject_cast<QQuickItem *>(second)->isVisible());
 }
 
 // Drives drag events through the window the way the platform does, so the

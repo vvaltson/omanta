@@ -9,6 +9,8 @@
 #include <QTest>
 #include <QUrl>
 
+#include <sys/stat.h>
+
 // Pure logic, no filesystem timing — these are the fast tests.
 class TestNavigation : public QObject
 {
@@ -32,6 +34,7 @@ private Q_SLOTS:
     void crumbsStartAtHomeWhenUnderHome();
     void crumbsStartAtRootOtherwise();
     void formatsSizes();
+    void textPreviewReadsTextOnly();
 
     // Locations (URIs)
     void uriDetectionAndLocality();
@@ -230,6 +233,58 @@ void TestNavigation::formatsSizes()
     QVERIFY(!platform.formatSize(0).isEmpty());
     QVERIFY(platform.formatSize(1500).contains(QLatin1String("kB"))
             || platform.formatSize(1500).contains(QLatin1String("KB")));
+}
+
+void TestNavigation::textPreviewReadsTextOnly()
+{
+    Platform platform;
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto write = [&](const char *name, const QByteArray &bytes) {
+        QFile file(dir.filePath(name));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(bytes);
+    };
+
+    write("notes.txt", "hello\nw\xc3\xb6rld\n");
+    QVariantMap preview = platform.textPreview(dir.filePath("notes.txt"), 1024);
+    QCOMPARE(preview.value("text").toString(), QString::fromUtf8("hello\nw\xc3\xb6rld\n"));
+    QCOMPARE(preview.value("truncated").toBool(), false);
+
+    // Empty is still text; the pane shows an empty page, not a card.
+    write("empty", "");
+    preview = platform.textPreview(dir.filePath("empty"), 1024);
+    QVERIFY(preview.contains("text"));
+    QCOMPARE(preview.value("text").toString(), QString());
+
+    // Longer than the limit: the start, flagged. Exactly at it: whole.
+    write("long.log", QByteArray(20000, 'x'));
+    preview = platform.textPreview(dir.filePath("long.log"), 10000);
+    QCOMPARE(preview.value("text").toString().size(), 10000);
+    QCOMPARE(preview.value("truncated").toBool(), true);
+    preview = platform.textPreview(dir.filePath("long.log"), 20000);
+    QCOMPARE(preview.value("truncated").toBool(), false);
+    // A limit under the 8000-byte sniff still cuts at the limit.
+    preview = platform.textPreview(dir.filePath("long.log"), 100);
+    QCOMPARE(preview.value("text").toString().size(), 100);
+    QCOMPARE(preview.value("truncated").toBool(), true);
+
+    // Binary: a NUL in the sniffed start. One past it is not looked for.
+    write("program", QByteArray("\x7f" "ELF\0\0", 6));
+    QVERIFY(platform.textPreview(dir.filePath("program"), 1024).isEmpty());
+    write("late-nul", QByteArray(9000, 'a') + QByteArray(1, '\0'));
+    QVERIFY(!platform.textPreview(dir.filePath("late-nul"), 100000).isEmpty());
+
+    // Not regular files: nothing, and promptly — a FIFO with no writer would
+    // block a read forever.
+    QVERIFY(platform.textPreview(dir.path(), 1024).isEmpty());
+    QVERIFY(platform.textPreview(dir.filePath("missing"), 1024).isEmpty());
+    QCOMPARE(::mkfifo(QFile::encodeName(dir.filePath("fifo")).constData(), 0600), 0);
+    QVERIFY(platform.textPreview(dir.filePath("fifo"), 1024).isEmpty());
+
+    // '#' and '?' are part of a file name, not a fragment or a query.
+    QCOMPARE(platform.fileUrl(QStringLiteral("/tmp/a #1?.png")).toLocalFile(),
+             QStringLiteral("/tmp/a #1?.png"));
 }
 
 void TestNavigation::uriDetectionAndLocality()

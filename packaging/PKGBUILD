@@ -25,7 +25,8 @@ optdepends=('gvfs-smb: browse smb:// shares'
             'gvfs-gphoto2: cameras'
             'ffmpegthumbnailer: video thumbnails'
             'localsearch: full-text search'
-            'sushi: Space previews')
+            'sushi: Space previews'
+            'qt6-webengine: PDFs in the F4 preview pane')
 makedepends=('cmake' 'ninja' 'git')
 source=("$pkgname::git+https://github.com/28allday/omanta.git#tag=v$pkgver")
 sha256sums=('SKIP')

@@ -44,6 +44,11 @@ Omarchy theme.
   Sushi, the previewer stock Omarchy ships — zoomable images, text,
   Markdown, PDF, audio, video, and office files when LibreOffice is
   installed. Arrow keys step through the folder; Space or Escape closes it
+- Preview pane: F4 shows the selected file in the other half of the window
+  — in split view, in place of the pane you are not working in, which F4
+  again brings back as it was. Images, PDFs (scrollable, needs
+  qt6-webengine), and the first 256 KB of anything that is not binary as
+  text; other files get their thumbnail or icon
 - Open With: right-click a file to open it in any app registered for its
   type, or "Other Application…" to choose one and set the default
 - Move to… and Copy to… in the right-click menu: pick a destination folder
