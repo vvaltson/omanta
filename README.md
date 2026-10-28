@@ -15,8 +15,10 @@ Omarchy theme.
 
 ## What you get
 
-- List and grid views, tabs, split view (F3), tree expansion, breadcrumbs +
-  Ctrl+L, type-ahead, configurable columns
+- List and grid views, tabs, tree expansion, breadcrumbs + Ctrl+L and an
+  Up button (Alt+Up), type-ahead, configurable columns
+- Split view: F3 opens a second pane, Tab moves between the two and F6
+  swaps their places. F3 again closes the pane you are not working in
 - Adjustable icon sizes in both views: Ctrl++ / Ctrl+- to resize, Ctrl+0
   to reset, or use View Options → Icon Size. List and grid each keep their
   own size, shared by every window and remembered after a restart.
@@ -46,9 +48,10 @@ Omarchy theme.
   installed. Arrow keys step through the folder; Space or Escape closes it
 - Preview pane: F4 shows the selected file in the other half of the window
   — in split view, in place of the pane you are not working in, which F4
-  again brings back as it was. Images, PDFs (scrollable, needs
-  qt6-webengine), and the first 256 KB of anything that is not binary as
-  text; other files get their thumbnail or icon
+  again brings back as it was; F3 swaps the preview for a split pane.
+  Images, PDFs (a whole page at a time, scrollable; needs qt6-webengine),
+  and the first 256 KB of anything that is not binary as text; other files
+  get their thumbnail or icon
 - Open With: right-click a file to open it in any app registered for its
   type, or "Other Application…" to choose one and set the default
 - Move to… and Copy to… in the right-click menu: pick a destination folder
@@ -203,7 +206,8 @@ Arch with Omarchy. Dependencies (`qt6-base`, `qt6-declarative`, `glib2`,
 `gvfs`, `libarchive`, `tinysparql`) are all in Omarchy's default install or
 pulled automatically. Optional: `gvfs-smb`/`gvfs-mtp`/`gvfs-gphoto2` for
 network shares, phones and cameras, `ffmpegthumbnailer` for video
-thumbnails, `localsearch` for full-text search.
+thumbnails, `localsearch` for full-text search, `sushi` for Space previews,
+`qt6-webengine` for PDFs in the F4 preview pane.
 
 ## Hacking on it
 
@@ -211,7 +215,7 @@ These scripts work from any directory:
 
 ```bash
 ./bin/build      # cmake + ninja into build/, then run ./build/omanta
-./bin/test       # the headless suites (ctest, ~25s)
+./bin/test       # the headless suites (ctest, ~40s)
 ./bin/test-sanitizers # Clang ASan, UBSan and leak checks
 ./bin/install    # user-local install: ~/.local/bin symlink, desktop entry, icon
 ```
@@ -219,6 +223,11 @@ These scripts work from any directory:
 `./bin/install` never touches `/usr` or pacman, and installs alongside your
 existing file manager — later rebuilds are picked up without reinstalling. For
 a real package instead, use the `makepkg -si` route above.
+
+Builds are Debug unless told otherwise. For a local build you use every day,
+set `OMANTA_BUILD_TYPE=Release` on `./bin/install` and on every later
+`./bin/build` or `./bin/test` — they share `build/`, so one plain run turns
+the installed binary back into a Debug build.
 
 Requires `cmake`, `ninja` and the Qt 6 development packages in addition to the
 runtime dependencies above.
