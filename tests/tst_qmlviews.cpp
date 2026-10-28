@@ -112,6 +112,7 @@ private Q_SLOTS:
     void tabTitlesFollowNavigation();
     void previewPaneShowsTheSelectedFile();
     void tabSwitchesAndF6SwapsPanes();
+    void arrowsEnterFoldersAndGoBack();
     void dropHintAndSidebarBookmarkDrop();
     void bookmarksReorderByHolding();
     void pickerBookmarksDoNotReorder();
@@ -2093,6 +2094,70 @@ void TestQmlViews::tabSwitchesAndF6SwapsPanes()
     QTest::keyClick(window, Qt::Key_F6);
     QTRY_VERIFY(x(left) < x(right));
     QCOMPARE(active(), right);
+}
+
+// List view, tree off: Right enters the folder under the cursor, Left goes back.
+void TestQmlViews::arrowsEnterFoldersAndGoBack()
+{
+    QTest::failOnWarning(QRegularExpression("Required property|Cannot assign.*undefined|TypeError|ReferenceError"));
+    TempTree tree;
+    QTemporaryDir config;
+    for (const char *env : {"OMANTA_SETTINGS_FILE", "OMANTA_STARRED_FILE",
+                           "OMANTA_SERVERS_FILE", "OMANTA_BOOKMARKS_FILE"})
+        qputenv(env, config.filePath(env).toUtf8());
+    qputenv("OMANTA_COLORS_FILE", config.filePath("missing/parent/colors.toml").toUtf8());
+    tree.writeFile("sub/inner.txt");
+    tree.writeFile("file.txt");
+
+    QQmlApplicationEngine engine;
+    engine.addImageProvider("fileicon", new IconImageProvider);
+    engine.addImageProvider("thumbnail", new ThumbnailProvider);
+    engine.addImageProvider("dragcard", new DragCardProvider);
+    Application application(&engine);
+    Platform platform;
+    SystemTheme theme;
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "App", &application);
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "Platform", &platform);
+    qmlRegisterSingletonInstance("Omanta.Runtime", 1, 0, "Theme", &theme);
+    application.openWindow(tree.path());
+    QQuickWindow *window = nullptr;
+    for (QObject *child : application.children()) {
+        if (child->property("currentTab").isValid()) {
+            window = qobject_cast<QQuickWindow *>(child);
+            break;
+        }
+    }
+    QVERIFY(window);
+    window->requestActivate();
+    QTRY_VERIFY(window->isActive());
+    auto *tab = qobject_cast<QQuickItem *>(window->property("currentTab").value<QObject *>());
+    QVERIFY(tab);
+    tab->setProperty("viewMode", "list");
+    tab->forceActiveFocus();
+    QObject *files = tab->property("files").value<QObject *>();
+    QTRY_COMPARE(files->property("count").toInt(), 2);
+    const auto path = [&] { return tab->property("path").toString(); };
+
+    // No history yet: Left stays put.
+    QTest::keyClick(window, Qt::Key_Left);
+    QCOMPARE(path(), tree.path());
+
+    int row = -1;
+    QVERIFY(QMetaObject::invokeMethod(files, "proxyRowForName", Q_RETURN_ARG(int, row),
+                                      Q_ARG(QString, QStringLiteral("sub"))));
+    tab->setProperty("currentIndex", row);
+    QTest::keyClick(window, Qt::Key_Right);
+    QTRY_COMPARE(path(), tree.filePath("sub"));
+    QTRY_COMPARE(files->property("count").toInt(), 1);
+    tab->setProperty("currentIndex", 0); // inner.txt
+
+    // Back lands on the folder you entered, Forward on where you left off.
+    QTest::keyClick(window, Qt::Key_Left);
+    QTRY_COMPARE(path(), tree.path());
+    QTRY_COMPARE(tab->property("currentIndex").toInt(), row);
+    QTest::keyClick(window, Qt::Key_Right, Qt::AltModifier);
+    QTRY_COMPARE(path(), tree.filePath("sub"));
+    QTRY_COMPARE(tab->property("currentIndex").toInt(), 0);
 }
 
 // Drives drag events through the window the way the platform does, so the

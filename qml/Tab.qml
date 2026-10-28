@@ -324,19 +324,30 @@ FocusScope {
         // model reports an unreachable location in the status line anyway.
         if (!Platform.isNavigable(target))
             return;
-        root.path = target;
+        leaveFor(target, false);
     }
 
     function goBack() {
         const target = history.goBack();
         if (target)
-            root.path = target;
+            leaveFor(target, true);
     }
 
     function goForward() {
         const target = history.goForward();
         if (target)
-            root.path = target;
+            leaveFor(target, true);
+    }
+
+    // The row the cursor was on in each folder this tab has left. Back and
+    // Forward put it there again — after Right, on the folder you entered.
+    property var cursorByPath: ({})
+
+    function leaveFor(target, restoreCursor) {
+        cursorByPath[path] = currentIndex >= 0 ? files.valueAt(currentIndex, "name") : "";
+        root.path = target;
+        // Applied when the listing finishes loading, like a reveal.
+        pendingSelection = restoreCursor ? (cursorByPath[target] || "") : "";
     }
 
     function goUp() {
@@ -663,6 +674,12 @@ FocusScope {
                 else if (files.valueAt(currentIndex, "expanded"))
                     moveCurrent(1, false);
                 event.accepted = true;
+            } else {
+                // Commander-style list keys: Right enters the folder under
+                // the cursor, Left (below) goes back.
+                if (currentIndex >= 0 && files.valueAt(currentIndex, "isDir"))
+                    activate(currentIndex);
+                event.accepted = true;
             }
             return;
         case Qt.Key_Left:
@@ -680,6 +697,9 @@ FocusScope {
                             setCurrent(parentRow, false);
                     }
                 }
+                event.accepted = true;
+            } else {
+                goBack();
                 event.accepted = true;
             }
             return;

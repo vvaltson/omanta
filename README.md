@@ -18,7 +18,8 @@ Omarchy theme.
 - List and grid views, tabs, tree expansion, breadcrumbs + Ctrl+L and an
   Up button (Alt+Up), type-ahead, configurable columns
 - Split view: F3 opens a second pane, Tab moves between the two and F6
-  swaps their places. F3 again closes the pane you are not working in
+  swaps their places. F3 again closes the pane you are not working in.
+  In list view → enters the folder under the cursor and ← goes back
 - Adjustable icon sizes in both views: Ctrl++ / Ctrl+- to resize, Ctrl+0
   to reset, or use View Options → Icon Size. List and grid each keep their
   own size, shared by every window and remembered after a restart.

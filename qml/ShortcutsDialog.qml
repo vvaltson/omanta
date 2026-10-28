@@ -31,6 +31,7 @@ Dialog {
             ["F9", qsTr("Toggle sidebar")]] },
         { name: qsTr("Navigation"), rows: [
             ["Alt+Left / Alt+Right", qsTr("Back / forward")], ["Alt+Up", qsTr("Parent folder")],
+            ["Left / Right", qsTr("Back / open folder (list view)")],
             ["Alt+Home", qsTr("Home folder")], ["Ctrl+L", qsTr("Edit the location")],
             ["Enter", qsTr("Open the selection")], ["Space", qsTr("Preview the selected file")],
             ["Backspace", qsTr("Parent folder")]] },
