@@ -298,6 +298,13 @@ Window {
                     onTriggered: root.currentTab.goForward()
                 }
 
+                ToolbarButton {
+                    symbol: "↑"
+                    tip: "Parent folder (Alt+Up)"
+                    enabled: root.currentTab && Platform.parentPath(root.currentTab.path) !== ""
+                    onTriggered: root.currentTab.goUp()
+                }
+
                 PathBar {
                     id: pathBar
                     objectName: "pathBar"
@@ -584,7 +591,8 @@ Window {
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: 6
+                // Over the files, not the sidebar, or the first tab reads as a sidebar row.
+                anchors.leftMargin: 6 + (root.sidebarInline ? sidebar.width : 0)
                 spacing: 2
 
                 Repeater {
@@ -595,7 +603,7 @@ Window {
                         required property string tabPath
                         required property string tabTitle
 
-                        width: Math.min(200, Math.max(120, root.width / tabModel.count - 8))
+                        width: Math.min(200, Math.max(120, parent.width / tabModel.count - 8))
                         height: 28
                         anchors.verticalCenter: parent.verticalCenter
                         radius: 4
